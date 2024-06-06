@@ -1,40 +1,36 @@
-extern crate strsim;
+use std::time::Instant;
 
-use std::fs::File;
-use std::io::{self, BufRead};
-use std::path::Path;
+use lazy_static::lazy_static;
+use rayon::prelude::*;
+use strsim::normalized_levenshtein;
 
-use strsim::jaro;
+lazy_static! {
+    static ref FILE: Vec<&'static str> = include_str!("english.txt")
+        .split_ascii_whitespace()
+        .map(|s| { s.trim() })
+        .collect::<Vec<&'static str>>();
+}
 
-fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
-where
-    P: AsRef<Path>,
-{
-    let file = File::open(filename)?;
-    Ok(io::BufReader::new(file).lines())
+#[derive(Clone, Copy)]
+struct TestStr {
+    query: &'static str,
+    threshold: f64
 }
 
 fn main() {
-    let filename = "english.txt";
-    let query = "WONDERFU";
-    let threshold = 0.87;
+    let test = TestStr {
+        query: "SUPERCALIRRAGILISTICEXPAIDLOCUS",
+        threshold: 0.75,
+    };
 
-    if let Ok(lines) = read_lines(filename) {
-        // Store the start time
-        let start = std::time::Instant::now();
-        for line in lines {
-            if let Ok(content) = line {
-                let similarity = jaro(&query, &content);
-                if similarity >= threshold {
-                    println!("Match: {} (similarity: {})", content, similarity);
-                }
-            }
+    let start = Instant::now();
+
+    FILE.par_iter().for_each(|s| {
+        let similarity = normalized_levenshtein(test.query, s);
+        if similarity >= test.threshold {
+            println!("Match: {} (similarity: {})", s, similarity);
         }
-        // Calculate the elapsed time
-        let elapsed = start.elapsed();
-        println!("Elapsed time: {:?}", elapsed);
-        println!("Done!");
-    } else {
-        println!("Could not read file: {}", filename);
-    }
+    });
+
+    println!("Elapsed: {:?}", start.elapsed());
 }
